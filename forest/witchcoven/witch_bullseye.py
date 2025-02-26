@@ -1,8 +1,8 @@
 """Main class, holding information about models and training/testing routines."""
 
 import torch
-from ..utils import bypass_last_layer
 from ..consts import BENCHMARK
+from ..utils import cw_loss
 torch.backends.cudnn.benchmark = BENCHMARK
 
 from .witch_base import _Witch
@@ -14,12 +14,17 @@ class WitchBullsEye(_Witch):
 
     """
 
-    def _define_objective(self, inputs, labels, criterion, targets, intended_classes, true_classes):
+    def _define_objective(self, inputs, labels, targets, intended_classes, true_classes):
         """Implement the closure here."""
-        def closure(model, optimizer, target_grad, target_clean_grad, target_gnorm):
+        def closure(model, criterion, optimizer, target_grad, target_clean_grad, target_gnorm):
             """This function will be evaluated on all GPUs."""  # noqa: D401
+            if self.args.target_criterion in ['cw', 'carlini-wagner']:
+                criterion = cw_loss
+            else:
+                pass  # use the default for untargeted or targeted cross entropy
             # Carve up the model
-            feature_model, last_layer = bypass_last_layer(model)
+            feature_model, last_layer = self.bypass_last_layer(model)
+
 
             # Get standard output:
             outputs = feature_model(inputs)
@@ -30,3 +35,15 @@ class WitchBullsEye(_Witch):
             feature_loss.backward(retain_graph=self.retain)
             return feature_loss.detach().cpu(), prediction.detach().cpu()
         return closure
+
+
+    @staticmethod
+    def bypass_last_layer(model):
+        """Hacky way of separating features and classification head for many models.
+
+        Patch this function if problems appear.
+        """
+        layer_cake = list(model.children())
+        last_layer = layer_cake[-1]
+        headless_model = torch.nn.Sequential(*(layer_cake[:-1]), torch.nn.Flatten())  # this works most of the time all of the time :<
+        return headless_model, last_layer

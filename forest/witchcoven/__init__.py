@@ -4,9 +4,9 @@ from .witch_metapoison import WitchMetaPoison, WitchMetaPoisonHigher, WitchMetaP
 from .witch_watermark import WitchWatermark
 from .witch_poison_frogs import WitchFrogs
 from .witch_bullseye import WitchBullsEye
-from .witch_patch import WitchPatch
-from .witch_htbd import WitchHTBD
-from .witch_convex_polytope import WitchConvexPolytope
+
+
+
 
 import torch
 

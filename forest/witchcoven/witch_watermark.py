@@ -1,3 +1,4 @@
+
 """Main class, holding information about models and training/testing routines."""
 
 import torch
@@ -29,17 +30,16 @@ class WitchWatermark(_Witch):
 
         for poison_id, (img, label, image_id) in enumerate(kettle.poisonset):
             poison_img = img.to(**self.setup)
-            dm, ds = kettle.dm[0], kettle.ds[0]  # remove batch dimension
 
             target_id = poison_id % len(kettle.targetset)
 
             # Place
             delta_slice = self.targets[target_id] - poison_img
-            delta_slice *= self.args.eps / ds / 255
+            delta_slice *= self.args.eps / 255
 
             # Project
-            delta_slice = torch.max(torch.min(delta_slice, self.args.eps / ds / 255), -self.args.eps / ds / 255)
-            delta_slice = torch.max(torch.min(delta_slice, (1 - dm) / ds - poison_img), -dm / ds - poison_img)
+            delta_slice = torch.max(torch.min(delta_slice, self.args.eps / kettle.ds / 255), -self.args.eps / kettle.ds / 255)
+            delta_slice = torch.max(torch.min(delta_slice, (1 - kettle.dm) / kettle.ds - poison_img), -kettle.dm / kettle.ds - poison_img)
             poison_delta[poison_id] = delta_slice.cpu()
 
         return poison_delta.cpu()
