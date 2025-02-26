@@ -7,10 +7,6 @@ from ..utils import cw_loss
 from ..consts import NON_BLOCKING, BENCHMARK
 torch.backends.cudnn.benchmark = BENCHMARK
 
-from ..victims.victim_single import _VictimSingle
-from ..victims.batched_attacks import construct_attack
-from ..victims.training import _split_data
-
 class _Witch():
     """Brew poison with given arguments.
 
@@ -122,18 +118,6 @@ class _Witch():
             # Rule 2
             self.tau0 = self.args.tau * (self.args.pbatch / 512) / self.args.ensemble
 
-        # Prepare adversarial attacker if necessary:
-        if self.args.padversarial is not None:
-            if not isinstance(victim, _VictimSingle):
-                raise ValueError('Test variant only implemented for single victims atm...')
-            attack = dict(type=self.args.padversarial, strength=self.args.defense_strength)
-            self.attacker = construct_attack(attack, victim.model, victim.loss_fn, kettle.dm, kettle.ds,
-                                             tau=kettle.args.tau, eps=kettle.args.eps, init='randn', optim='signAdam',
-                                             num_classes=len(kettle.trainset.classes), setup=kettle.setup)
-
-        # Prepare adaptive mixing to dilute with additional clean data
-        if self.args.pmix:
-            self.extra_data = iter(kettle.trainloader)
 
 
     def _run_trial(self, victim, kettle):
@@ -180,7 +164,7 @@ class _Witch():
                 att_optimizer.step()
                 if self.args.scheduling:
                     scheduler.step()
-                att_optimizer.zero_grad()
+                att_optimizer.zero_grad(set_to_none=False)
                 with torch.no_grad():
                     # Projection Step
                     poison_delta.data = torch.max(torch.min(poison_delta, self.args.eps /
@@ -213,78 +197,36 @@ class _Witch():
 
         inputs = inputs.to(**self.setup)
         labels = labels.to(dtype=torch.long, device=self.setup['device'], non_blocking=NON_BLOCKING)
-        # Check adversarial pattern ids
-        poison_slices, batch_positions = kettle.lookup_poison_indices(ids)
+        # Add adversarial pattern
+        poison_slices, batch_positions = [], []
+        for batch_id, image_id in enumerate(ids.tolist()):
+            lookup = kettle.poison_lookup.get(image_id)
+            if lookup is not None:
+                poison_slices.append(lookup)
+                batch_positions.append(batch_id)
 
         # This is a no-op in single network brewing
         # In distributed brewing, this is a synchronization operation
         inputs, labels, poison_slices, batch_positions, randgen = victim.distributed_control(
             inputs, labels, poison_slices, batch_positions)
 
-        # If a poisoned id position is found, the corresponding pattern is added here:
         if len(batch_positions) > 0:
             delta_slice = poison_delta[poison_slices].detach().to(**self.setup)
             if self.args.clean_grad:
                 delta_slice = torch.zeros_like(delta_slice)
-            delta_slice.requires_grad_()  # TRACKING GRADIENTS FROM HERE
+            delta_slice.requires_grad_()
             poison_images = inputs[batch_positions]
             inputs[batch_positions] += delta_slice
-
-            # Add additional clean data if mixing during the attack:
-            if self.args.pmix:
-                if 'mix' in victim.defs.mixing_method['type']:   # this covers mixup, cutmix 4waymixup, maxup-mixup
-                    try:
-                        extra_data = next(self.extra_data)
-                    except StopIteration:
-                        self.extra_data = iter(kettle.trainloader)
-                        extra_data = next(self.extra_data)
-                    extra_inputs = extra_data[0].to(**self.setup)
-                    extra_labels = extra_data[1].to(dtype=torch.long, device=self.setup['device'], non_blocking=NON_BLOCKING)
-                    inputs = torch.cat((inputs, extra_inputs), dim=0)
-                    labels = torch.cat((labels, extra_labels), dim=0)
 
             # Perform differentiable data augmentation
             if self.args.paugment:
                 inputs = kettle.augment(inputs, randgen=randgen)
 
-            # Perform mixing
-            if self.args.pmix:
-                inputs, extra_labels, mixing_lmb = kettle.mixer(inputs, labels)
-
-            if self.args.padversarial is not None:
-                # The optimal choice of the 3rd and 4th argument here are debatable
-                # This is likely the strongest anti-defense:
-                # but the defense itself splits the batch and uses half of it as targets
-                # instead of using the known target [as the defense does not know about the target]
-                # delta = self.attacker.attack(inputs.detach(), labels,
-                #                              self.targets, self.true_classes, steps=victim.defs.novel_defense['steps'])
-
-                # This is a more accurate anti-defense:
-                [temp_targets, inputs,
-                 temp_true_labels, labels,
-                 temp_fake_label] = _split_data(inputs, labels, target_selection=victim.defs.novel_defense['target_selection'])
-                delta, additional_info = self.attacker.attack(inputs.detach(), labels,
-                                                              temp_targets, temp_fake_label, steps=victim.defs.novel_defense['steps'])
-                inputs = inputs + delta  # Kind of a reparametrization trick
-
-
-
             # Define the loss objective and compute gradients
-            if self.args.target_criterion in ['cw', 'carlini-wagner']:
-                loss_fn = cw_loss
-            else:
-                loss_fn = torch.nn.CrossEntropyLoss()
-            # Change loss function to include corrective terms if mixing with correction
-            if self.args.pmix:
-                def criterion(outputs, labels):
-                    loss, pred = kettle.mixer.corrected_loss(outputs, extra_labels, lmb=mixing_lmb, loss_fn=loss_fn)
-                    return loss
-            else:
-                criterion = loss_fn
-
-            closure = self._define_objective(inputs, labels, criterion, self.targets, self.intended_classes,
+            closure = self._define_objective(inputs, labels, self.targets, self.intended_classes,
                                              self.true_classes)
-            loss, prediction = victim.compute(closure, self.target_grad, self.target_clean_grad, self.target_gnorm)
+            loss, prediction = victim.compute(closure, self.target_grad, self.target_clean_grad,
+                                              self.target_gnorm)
             delta_slice = victim.sync_gradients(delta_slice)
 
             if self.args.clean_grad:
@@ -306,9 +248,9 @@ class _Witch():
 
         return loss.item(), prediction.item()
 
-    def _define_objective():
+    def _define_objective(self):
         """Implement the closure here."""
-        def closure(model, *args):
+        def closure(model, criterion, *args):
             """This function will be evaluated on all GPUs."""  # noqa: D401
             raise NotImplementedError()
             return target_loss.item(), prediction.item()
@@ -328,8 +270,3 @@ class _Witch():
             delta_slice.data = torch.max(torch.min(delta_slice, (1 - dm) / ds -
                                                    poison_imgs), -dm / ds - poison_imgs)
         return delta_slice
-
-
-    def patch_targets(self, kettle):
-        """Backdoor trigger attacks need to patch kettle.targets."""
-        pass
