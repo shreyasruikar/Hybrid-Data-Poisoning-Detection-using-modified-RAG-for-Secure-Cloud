@@ -21,6 +21,8 @@ if __name__ == "__main__":
     setup = forest.utils.system_startup(args)
 
     model = forest.Victim(args, setup=setup)
+    if args.mixing_method is None:
+        args.mixing_method = {'type': '', 'strength': 0.0, 'correction': True}
     data = forest.Kettle(args, model.defs.batch_size, model.defs.augmentations, setup=setup)
     witch = forest.Witch(args, setup=setup)
 

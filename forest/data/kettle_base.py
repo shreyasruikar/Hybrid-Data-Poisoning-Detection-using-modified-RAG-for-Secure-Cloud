@@ -47,8 +47,8 @@ class _Kettle():
         self.args, self.setup = args, setup
         self.batch_size = batch_size
         self.augmentations = augmentations
-        self.mixing_method = self.mixing_method = mixing_method if mixing_method is not None else {'type': ''}
-
+        self.mixing_method = mixing_method if mixing_method is not None else {'type': '', 'strength': 0.0,
+                                                                              'correction': True}
 
         self.trainset, self.validset = construct_datasets(self.args.dataset, self.args.data_path, NORMALIZE)
         if self.args.pretrain_dataset is not None:
