@@ -23,10 +23,14 @@ if __name__ == "__main__":
     model = forest.Victim(args, setup=setup)
     if args.mixing_method is None:
         args.mixing_method = {'type': '', 'strength': 0.0, 'correction': True}
-    data = forest.Kettle(args, model.defs.batch_size, model.defs.augmentations, setup=setup)
+    print(f"mixing_method before Kettle: {args.mixing_method}")
+    data = forest.Kettle(args, model.defs.batch_size, model.defs.augmentations, args.mixing_method, setup=setup)
     witch = forest.Witch(args, setup=setup)
 
     start_time = time.time()
+    if not hasattr(args, "pretrained"):
+        args.pretrained = False  # or True, depending on your intended behavior
+
     if args.pretrained:
         print('Loading pretrained model...')
         stats_clean = None

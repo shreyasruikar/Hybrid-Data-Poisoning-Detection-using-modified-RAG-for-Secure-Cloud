@@ -9,8 +9,10 @@ from .kettle_external import KettleExternal
 __all__ = ['Kettle', 'KettleExternal']
 
 
-def Kettle(args, batch_size, augmentations, mixing_method=dict(type=None, strength=0.0),
-           setup=dict(device=torch.device('cpu'), dtype=torch.float)):
+def Kettle(args, batch_size, augmentations, mixing_method, setup):
+    print(f"Kettle received mixing_method: {mixing_method}")
+    return KettleRandom(args, batch_size, augmentations, mixing_method, setup)
+
     """Interface to connect to a kettle [data] child class."""
 
     if args.poisonkey is None:
