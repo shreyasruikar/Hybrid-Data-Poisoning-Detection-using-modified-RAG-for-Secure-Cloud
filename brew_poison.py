@@ -20,12 +20,17 @@ import torch
 
 import datetime
 import time
+import sys
+import os
+
+# Add the parent directory to sys.path
+sys.path.append(os.path.abspath("/content/Hybrid-Data-Poisoning-Detection-using-modified-RAG-for-Secure-Cloud"))
+
 
 import forest
 from forest.filtering_defenses import get_defense
 torch.backends.cudnn.benchmark = forest.consts.BENCHMARK
-torch.multiprocessing.set_sharing_strategy(forest.consts.SHARING_STRATEGY)
-
+torch.multiprocessing.set_sharing_strategy("file_system")
 # Parse input arguments
 args = forest.options().parse_args()
 # 100% reproducibility?

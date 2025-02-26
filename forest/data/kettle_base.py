@@ -19,8 +19,7 @@ from .mixing_data_augmentations import Mixup, Cutout, Cutmix, Maxup
 from ..consts import PIN_MEMORY, NORMALIZE, BENCHMARK, DISTRIBUTED_BACKEND, SHARING_STRATEGY, MAX_THREADING
 
 torch.backends.cudnn.benchmark = BENCHMARK
-torch.multiprocessing.set_sharing_strategy(SHARING_STRATEGY)
-
+torch.multiprocessing.set_sharing_strategy("file_system")
 class _Kettle():
     """Brew poison with given arguments.
 

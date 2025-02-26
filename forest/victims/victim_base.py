@@ -8,8 +8,7 @@ from ..hyperparameters import training_strategy
 from ..utils import average_dicts
 from ..consts import BENCHMARK, SHARING_STRATEGY
 torch.backends.cudnn.benchmark = BENCHMARK
-torch.multiprocessing.set_sharing_strategy(SHARING_STRATEGY)
-
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 FINETUNING_LR_DROP = 0.001
 

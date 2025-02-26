@@ -32,7 +32,7 @@ class KettleRandom(_Kettle):
         """
         if self.args.local_rank is None:
             if self.args.poisonkey is None:
-                self.init_seed = np.random.randint(0, 2**32 - 1)
+                self.init_seed = np.random.randint(0, 2**31 - 1)
             else:
                 self.init_seed = int(self.args.poisonkey)
             set_random_seed(self.init_seed)
