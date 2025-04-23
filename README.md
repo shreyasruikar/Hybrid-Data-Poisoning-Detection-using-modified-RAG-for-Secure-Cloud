@@ -29,10 +29,6 @@ Machine learning models are vulnerable to data poisoning attacks where adversari
 
 ---
 
-## Project Structure
-
-Hybrid-Data-Poisoning-Detection/ │ ├── brew_poison.py ├── defaults.sh ├── defaults_distributed.sh ├── dist_brew_poison.py ├── main.py ├── README.md ├── test_poisons.py ├── training_loop.py ├── init.py │ ├── data/ │ ├── cifar-10-python.tar.gz │ └── cifar-10-batches-py/ │ ├── batches.meta │ ├── data_batch_1 to data_batch_5 │ ├── readme.html │ └── test_batch │ ├── forest/ │ ├── angular-expanse-455003-v7-cc6a622f8eaa.json │ ├── consts.py, cpoutput.txt, gcloud.py, ... │ ├── data/ │ │ ├── *.py │ │ └── pycache/ │ ├── victims/ │ │ ├── *.py │ │ └── pycache/ │ ├── visualizations/ │ │ ├── gcp_activity.png │ │ ├── pca_detection.png │ │ ├── poison_output.py │ │ └── xai_analysis.py │ ├── witchcoven/ │ │ ├── *.py │ │ ├── *.png │ │ └── pycache/ │ └── pycache/ │ ├── log/ │ └── README.md │ ├── patches/ │ ├── firefox.jpg │ └── trigger_10.png │ ├── poisons/ │ └── README.md │ └── scripts/ └── benchmark_gen.py
-
 
 
 
